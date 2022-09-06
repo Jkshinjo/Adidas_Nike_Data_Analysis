@@ -1,0 +1,123 @@
+--Shows the count of all rows, descriptions, listing prices, and number of last visited--
+SELECT COUNT(*) as total_rows, 
+    COUNT(description) as count_description,
+    COUNT(listing_price) as count_listing_price, 
+    COUNT(last_visited) as count_last_visited
+FROM info 
+JOIN finance 
+    USING(product_id)
+JOIN traffic
+    USING(product_id);
+
+
+--Shows the count of products in price range--
+SELECT brand, listing_price :: int, COUNT(product_id)
+FROM brands
+INNER JOIN finance
+    USING(product_id)
+WHERE listing_price > 0
+GROUP BY brand, listing_price
+ORDER BY listing_price DESC;
+
+
+--Puts prices in bins and shows the count of products by brand in each bin--
+ 
+SELECT brand, COUNT(product_id), SUM(revenue) as total_revenue, 
+CASE WHEN listing_price < 42 THEN 'Budget' 
+WHEN listing_price BETWEEN 42 and 72 THEN 'Average' 
+WHEN listing_price BETWEEN 74 and 129 THEN 'Expensive'
+WHEN listing_price > 129 THEN 'Elite' END as price_category
+FROM brands 
+INNER JOIN finance 
+  USING(product_id)
+WHERE brand IS NOT NULL
+GROUP BY brand, price_category 
+ORDER BY total_revenue DESC;
+
+
+--Shows average discount percentage by brand--
+SELECT brand, CONCAT(AVG(discount) * 100, '%') as average_discount
+FROM brands
+INNER JOIN finance 
+    USING(product_id)
+GROUP BY brand
+HAVING brand IS NOT NULL
+ORDER BY average_discount;
+
+ 
+--Shows correlation between reviews and revenue--
+SELECT CORR(reviews, revenue) as review_revenue_corr
+FROM reviews
+INNER JOIN finance
+    USING(product_id);
+    
+    
+--Shows description length and average review--
+SELECT TRUNC(LENGTH(description),-2) as description_length, 
+ROUND(AVG(rating :: numeric), 2) as average_rating
+FROM info
+INNER JOIN reviews
+    USING(product_id)
+WHERE description IS NOT NULL
+GROUP BY description_length
+ORDER BY description_length;
+
+
+--Shows count of reviews by month by brand--
+SELECT brand, EXTRACT(MONTH FROM last_visited) as month,
+COUNT(reviews.product_id) as num_reviews 
+FROM brands
+INNER JOIN reviews 
+    USING(product_id)
+INNER JOIN traffic 
+    USING(product_id)
+WHERE brand IS NOT NULL and EXTRACT(MONTH FROM last_visited) IS NOT NULL
+GROUP BY brand, month
+ORDER BY brand, month;
+
+
+--Shows number of footwear and median revenue--
+WITH footwear as 
+(SELECT description, revenue 
+ FROM info 
+    INNER JOIN finance 
+     USING(product_id)
+WHERE description ILIKE '%shoe%'
+      or description ILIKE '%trainer%'
+      or description ILIKE '%foot%'
+      and description IS NOT NULL)
+
+SELECT COUNT(*) as num_footwear_products, 
+percentile_disc(0.5) WITHIN GROUP (ORDER BY revenue)as median_footwear_revenue
+FROM footwear;
+
+
+--Shows number of non-footwear and median revenue
+WITH footwear as (SELECT description, revenue 
+ FROM info 
+ INNER JOIN finance 
+     USING(product_id)
+WHERE description ILIKE '%shoe%'
+      or description ILIKE '%trainer%'
+      or description ILIKE '%foot%'
+      and description IS NOT NULL)
+
+SELECT COUNT(product_id) as num_clothing_products, 
+WITH footwear as 
+(SELECT description, revenue 
+ FROM info 
+ INNER JOIN finance 
+     USING(product_id)
+WHERE description ILIKE '%shoe%'
+         or description ILIKE '%trainer%'
+         or description ILIKE '%foot%'
+         and description IS NOT NULL)
+
+SELECT COUNT(product_id) as num_clothing_products, 
+PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY revenue) as median_clothing_revenue
+FROM info 
+INNER JOIN finance 
+    USING(product_id)
+WHERE description NOT IN 
+        (SELECT description FROM footwear);
+
